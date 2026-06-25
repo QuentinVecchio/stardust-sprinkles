@@ -43,6 +43,36 @@ Outputs expected at:
 - `/workspace/stardust/prototypes/home-C-cinematic.html`
 - `/workspace/stardust/direction.md` — variant directions + recommendation
 
+### Step 1b — Open the pipeline sprinkle immediately
+
+As soon as the uplift scoop starts, create a `<slug>-pipeline` scoop and open the
+pipeline sprinkle so the user has a live status view from the beginning — even before
+uplift completes. Populate it with the initial state (Extract in-progress, everything
+else pending) and update it as each phase completes.
+
+**Steps to track in the pipeline sprinkle:**
+
+| Step | Status when | Sub-steps |
+|---|---|---|
+| Extract | in-progress immediately → done when brand-review.html exists | — |
+| Audit | done when uplift-improvements.md exists | 5 tensions count |
+| Brand Review | done with extract | links to brand-review.html |
+| Direction | done when direction.md exists | 3 variants listed |
+| Prototypes | done when all 3 HTML files exist | A · B · C each with view ↗ link |
+| Deploy | in-progress when user clicks Deploy → | Blocks · Deliverables · DA write · Preview · Publish |
+| Iterate | pending until user requests changes | — |
+
+**Updating the pipeline after each phase:**
+Feed the pipeline scoop after each major phase:
+```
+feed_scoop("<slug>-pipeline", "Mark step '<id>' as done. Meta: '<summary>'. Link: '<url>'. Reload.")
+```
+
+**Auto-refresh:** The pipeline sprinkle polls `admin.hlx.page/status/<org>/<repo>/<branch>/`
+every 30s to keep Preview and Publish sub-steps current without manual updates.
+
+**Template:** `/workspace/skills/stardust-demo/templates/pipeline.shtml`
+
 ### Step 2 — Serve prototype screenshots
 
 For each prototype, take a Playwright screenshot and serve via `open`:
