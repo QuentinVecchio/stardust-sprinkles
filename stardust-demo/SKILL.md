@@ -107,6 +107,26 @@ If `/workspace/stardust/state.json` exists and was written for the same URL:
 - If reuse: skip Step 1, go straight to Steps 2–5.
 - If re-run: clear `/workspace/stardust/` and start fresh.
 
+## Step 6 — Deploy the chosen variant
+
+Once the user has picked a variant (A, B, or C), invoke `stardust:deploy` to convert the
+prototype HTML into a live Edge Delivery Services (AEM) site.
+
+```
+stardust:deploy stardust/prototypes/home-<X>-proposed.html
+```
+
+`stardust:deploy` owns:
+- Converting each prototype `<section>` into an EDS block (`blocks/<name>/<name>.js` + `.css`)
+- Authoring EDS content pages under `content/`
+- Static header/footer fragments at `fragments/header.html` + `fragments/footer.html`
+- Updating `styles/styles.css` with brand tokens
+- Self-hosting fonts with metric-matched fallbacks (zero CLS)
+- Deploying via DA Source API (`PUT admin.da.live/source/…`) + AEM preview/publish
+- Visual + structural diff validation against the original prototype
+
+Trigger phrase for the user: "deploy variant B" or "let's go with B".
+
 ## Saving to git
 
 After generating sprinkles, offer to push to the templates repo:
