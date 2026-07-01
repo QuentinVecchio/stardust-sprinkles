@@ -1,216 +1,292 @@
 ---
 name: stardust-demo
 description: |
-  Use this when the user wants to run a stardust presales demo for a website — uplift a URL
-  and automatically open three sprinkles (audit report, brand review, and variants review) 
-  populated with the results. Covers the full stardust:uplift pipeline plus auto-generating
-  and opening the three demo sprinkles. Use this instead of running stardust:uplift manually
-  when the goal is a complete, ready-to-present demo package.
-allowed-tools: bash, read_file, write_file, edit_file
+  Orchestrate a full stardust presales demo for a website — uplift a URL,
+  open 4 sprinkles (pipeline, audit, brand review, variants), and deploy
+  the user's chosen variant to EDS. Use inside SLICC with DA token and
+  GitHub access pre-configured by the Stardust Lab.
+user-invocable: true
 ---
 
 # stardust-demo
 
-One command. One URL. Three demo sprinkles ready to present.
+One URL in. Four sprinkles open. A deployed EDS site out.
 
-`stardust-demo` runs `stardust:uplift` on a URL and then automatically generates and opens
-three sprinkles in the stardust design system style:
+Orchestrates `stardust:uplift` → sprinkle generation → user variant selection → `stardust:deploy` inside SLICC.
 
-| Sprinkle | Icon | Content |
-|---|---|---|
-| `<slug>-audit` | triangle-alert | 5 tensions found by the uplift audit |
-| `<slug>-brand-review` | palette | Brand review HTML from the extraction |
-| `<slug>-variants` | layout-panel-left | 3 variant cards with recommendation |
+## Prerequisites
 
-## Setup
+- `stardust` skill installed (`upskill adobe/skills --skill stardust`)
+- `impeccable` skill available at `/workspace/skills/impeccable/`
+- DA token available via `oauth-token adobe`
+- GitHub access configured by the Stardust Lab
+- EDS repo + DA org pre-created by the Stardust Lab
 
-1. Verify `stardust` skill is installed (`skill list | grep stardust`). If not: `upskill adobe/skills --skill stardust`.
-2. Verify `impeccable` skill files are at `/workspace/skills/impeccable/`. If not, fetch from `pbakaus/impeccable`.
-3. Check `/workspace/stardust/state.json` — if a previous uplift ran for the same URL, ask the user whether to re-run or use existing artifacts.
+## Slug Derivation
 
-## Architecture: hybrid scoop + workflow
+Derive from URL hostname + 4 random hex chars:
+- `https://wknd.site` → `wknd-a3f1`
+- `https://www.knack.com` → `knack-9c2e`
 
-The demo uses two execution models:
-
-| Component | Model | Why |
-|---|---|---|
-| **Uplift** | Scoop (cone-orchestrated) | Needs full context, may ask user questions mid-run |
-| **Sprinkle generation** | Workflow (parallel fan-out) | Pure template population, no interaction, parallelizable |
-
-The cone orchestrates:
-1. Launches the uplift scoop (interactive — can relay questions to user)
-2. When uplift completes, launches the workflow to generate all 4 sprinkles in parallel
-3. Handles deploy when the user picks a variant
+Strip `www.`, take first segment before `.`, lowercase, append `-$(openssl rand -hex 2)`.
 
 ## Procedure
 
-### Step 1 — Run the uplift (scoop, interactive)
+### Step 1 — Setup & open pipeline sprinkle
 
-Delegate the full `stardust:uplift` pipeline to a scoop:
+1. Derive slug from the URL
+2. Read `/workspace/skills/stardust-demo/templates/pipeline.shtml.tpl`
+3. Replace `{{URL}}` and `{{SLUG}}`
+4. Write to `/shared/sprinkles/{{SLUG}}-pipeline/{{SLUG}}-pipeline.shtml`
+5. Run: `sprinkle open {{SLUG}}-pipeline`
+6. Push initial status:
+   ```
+   sprinkle send {{SLUG}}-pipeline '{"step":"extract","status":"active","summary":"Starting extraction..."}'
+   ```
+
+### Step 2 — Run uplift (scoop)
+
+Spawn the uplift scoop:
+
 ```
-scoop_scoop("<slug>-uplift")
-feed_scoop("<slug>-uplift", "<full uplift prompt for URL>")
+scoop_scoop({
+  name: "{{SLUG}}-uplift",
+  model: "claude-opus-4-6",
+  writablePaths: ["/scoops/{{SLUG}}-uplift/", "/shared/", "/workspace/stardust/"]
+})
 ```
 
-The scoop runs all 6 uplift phases in sequence with full context. If the uplift agent
-encounters a stop condition (brand surface too thin, improvements list empty, etc.) it
-**surfaces the question to the cone** which relays it to the user. The cone feeds the
-user's answer back:
+Feed the scoop:
+
 ```
-feed_scoop("<slug>-uplift", "User answered: <answer>. Continue.")
+## STEP 1 — MANDATORY
+
+Run: read_file /workspace/skills/stardust/skills/uplift/SKILL.md
+Then follow those instructions EXACTLY for URL: {{URL}}
+
+## Context
+
+- URL: {{URL}}
+- Slug: {{SLUG}}
+- State dir: /workspace/stardust/
+- Output contract: write status updates to /shared/stardust-demo/uplift-status.json
+
+## DA Auth
+
+- Get IMS token: DA_TOKEN=$(oauth-token adobe)
+
+## Progress updates
+
+After each major phase completes, write a status file:
+/shared/stardust-demo/uplift-status.json
+
+Format: {"phase":"extract|audit|brand-review|direction|prototypes","status":"done","summary":"..."}
+
+Phases in order: extract → audit → brand-review → direction → prototypes
 ```
 
-This preserves the monolithic reasoning chain while allowing mid-run interaction.
+**While uplift runs:**
+- Yield after spawning. Do NOT poll.
+- When the scoop-ready lick arrives, read `/shared/stardust-demo/uplift-status.json`
+- Push status to pipeline sprinkle immediately:
+  ```
+  sprinkle send {{SLUG}}-pipeline "$(cat /shared/stardust-demo/uplift-status.json)"
+  ```
 
-Outputs when complete:
+**If uplift asks about existing state** (prior `state.json` for same URL):
+- Relay the question to the user in chat
+- Feed the user's answer back: `feed_scoop("{{SLUG}}-uplift", "User answered: <answer>. Continue.")`
+
+**Uplift outputs when complete:**
 - `/workspace/stardust/uplift-improvements.md` — 5 tensions
-- `/workspace/stardust/current/brand-review.html` — brand review
+- `/workspace/stardust/current/brand-review.html` — brand review page
 - `/workspace/stardust/current/_brand-extraction.json` — palette + type
 - `/workspace/stardust/prototypes/home-A-proposed.html`
 - `/workspace/stardust/prototypes/home-B-proposed.html`
 - `/workspace/stardust/prototypes/home-C-cinematic.html`
 - `/workspace/stardust/direction.md` — variant directions + recommendation
 
-### Step 2 — Generate sprinkles (workflow, parallel)
+### Step 3 — Open remaining sprinkles (inline)
 
-Once the uplift scoop completes, launch the workflow:
-```bash
-workflow run /workspace/stardust-demo-skills/stardust-demo/stardust-demo.workflow.js \
-  --args '{"url":"<URL>","slug":"<slug>"}'
+Once the uplift scoop completes, the cone does all of this inline (no scoops):
+
+#### 3a. Audit sprinkle
+
+1. Read `/workspace/stardust/uplift-improvements.md`
+2. Parse the 5 tensions into a JSON array:
+   ```json
+   [
+     {"category":"dated-pattern","title":"...","body":"..."},
+     {"category":"ia-clutter","title":"...","body":"..."},
+     ...
+   ]
+   ```
+   Valid categories: `dated-pattern`, `ia-clutter`, `density`, `cliche`, `missed-opportunity`
+3. Read `/workspace/skills/stardust-demo/templates/audit.shtml.tpl`
+4. Replace `{{URL}}`, `{{SLUG}}`, `{{TENSIONS_JSON}}` (JSON-escaped into the template)
+5. Write to `/shared/sprinkles/{{SLUG}}-audit/{{SLUG}}-audit.shtml`
+6. Run: `sprinkle open {{SLUG}}-audit`
+
+#### 3b. Brand review sprinkle
+
+1. Serve the brand review: `open /workspace/stardust/current/brand-review.html`
+2. Get the preview URL from the `open` command output
+3. Read `/workspace/skills/stardust-demo/templates/brand-review.shtml.tpl`
+4. Replace `{{URL}}`, `{{BRAND_REVIEW_URL}}`
+5. Write to `/shared/sprinkles/{{SLUG}}-brand-review/{{SLUG}}-brand-review.shtml`
+6. Run: `sprinkle open {{SLUG}}-brand-review`
+
+#### 3c. Variants sprinkle
+
+1. Serve all 3 prototypes:
+   ```
+   open /workspace/stardust/prototypes/home-A-proposed.html
+   open /workspace/stardust/prototypes/home-B-proposed.html
+   open /workspace/stardust/prototypes/home-C-cinematic.html
+   ```
+2. Take screenshots of each (via `playwright-cli screenshot`)
+3. Serve screenshots: `open /shared/{{SLUG}}-variant-A.png` etc.
+4. Read `/workspace/stardust/direction.md` — extract:
+   - Variant titles, pitches, what-if questions, moves, roles
+   - Which variant is recommended
+   - Shared fixes across all variants
+5. Read `/workspace/skills/stardust-demo/templates/variants.shtml.tpl`
+6. Replace all placeholders:
+   - `{{URL}}`, `{{SLUG}}`
+   - `{{SCREENSHOT_A}}`, `{{SCREENSHOT_B}}`, `{{SCREENSHOT_C}}`
+   - `{{VARIANT_A_URL}}`, `{{VARIANT_B_URL}}`, `{{VARIANT_C_URL}}`
+   - `{{VARIANT_A_TITLE}}`, `{{VARIANT_A_PITCH}}`, `{{VARIANT_A_WHATIF}}`, `{{VARIANT_A_MOVES_JSON}}`, `{{VARIANT_A_ROLE}}`
+   - Same pattern for B and C
+   - `{{FIXES_JSON}}` — JSON array of shared fix strings
+   - `{{RECOMMENDED}}` — letter of recommended variant (A, B, or C)
+7. Write to `/shared/sprinkles/{{SLUG}}-variants/{{SLUG}}-variants.shtml`
+8. Run: `sprinkle open {{SLUG}}-variants`
+
+#### 3d. Update pipeline
+
+Push final uplift status:
+```
+sprinkle send {{SLUG}}-pipeline '{"step":"prototypes","status":"done","summary":"3 variants ready for review"}'
 ```
 
-The workflow handles (in parallel):
-- Serving prototypes + taking screenshots
-- Generating and opening all 4 sprinkles from templates (pipeline, brand-review, audit, variants)
+### Step 4 — Wait for variant selection (lick)
 
-### Step 3 — Report
-
-When the workflow completes (delivered as a lick), print:
-```
-demo ready — <URL>
-
-sprinkles open:
-  <slug>-pipeline       — live status
-  <slug>-audit          — 5 tensions
-  <slug>-brand-review   — brand extraction
-  <slug>-variants       — 3 variants, B recommended
-
-Next: pick a variant (click Deploy → in the variants sprinkle)
+The variants sprinkle fires a lick when the user clicks "Deploy":
+```json
+{"action": "select-variant", "variant": "B"}
 ```
 
-## Template system
+When the cone receives this lick:
+1. Confirm with the user: "Deploy variant {{VARIANT}}? This will convert it to an EDS site."
+2. If confirmed, proceed to Step 5
+3. If the user wants a different variant, wait for another lick
 
-Templates live in `/workspace/skills/stardust-demo/templates/`:
-- `audit.shtml` — audit sprinkle template with `{{TENSIONS}}`, `{{SLUG}}`, `{{URL}}` tokens
-- `brand-review.shtml` — brand review template with `{{BRAND_REVIEW_URL}}`, `{{URL}}` tokens
-- `variants.shtml` — variants template with `{{VARIANT_A_URL}}`, `{{VARIANT_B_URL}}`, `{{VARIANT_C_URL}}`, `{{SCREENSHOT_A}}`, `{{SCREENSHOT_B}}`, `{{SCREENSHOT_C}}`, `{{FIXES}}`, `{{URL}}` tokens
+### Step 5 — Deploy (scoop)
 
-Read the template, replace the tokens with content from the uplift artifacts, write the populated file.
+1. Push pipeline status:
+   ```
+   sprinkle send {{SLUG}}-pipeline '{"step":"deploy","status":"active","summary":"Deploying variant {{VARIANT}}..."}'
+   ```
 
-## Slug derivation
+2. Spawn deploy scoop:
+   ```
+   scoop_scoop({
+     name: "{{SLUG}}-deploy",
+     model: "claude-opus-4-6",
+     writablePaths: ["/scoops/{{SLUG}}-deploy/", "/shared/", "/workspace/{REPO}/"]
+   })
+   ```
 
-Derive a short slug from the URL hostname + a random 4-character hex ID:
-- `https://wknd.site` → `wknd-a3f1`
-- `https://www.knack.com` → `knack-9c2e`
-- `https://adobe.com` → `adobe-7b04`
+3. Feed the scoop:
+   ```
+   ## STEP 1 — MANDATORY
 
-Strip `www.`, take the first hostname segment before `.`, lowercase, then append `-` and 4 random hex characters (e.g. `$(openssl rand -hex 2)`).
+   Run: read_file /workspace/skills/stardust/skills/deploy/SKILL.md
+   Then follow those instructions EXACTLY.
 
-## Re-run behavior
+   ## Context
 
-If `/workspace/stardust/state.json` exists and was written for the same URL:
-- Ask: "I have an existing uplift for `<URL>` from `<date>`. Re-run the extraction or use the existing artifacts?"
-- If reuse: skip Step 1, go straight to Steps 2–5.
-- If re-run: clear `/workspace/stardust/` and start fresh.
+   - Prototype to deploy: /workspace/stardust/prototypes/home-{{VARIANT}}-proposed.html
+     (if variant C: /workspace/stardust/prototypes/home-C-cinematic.html)
+   - EDS repo: /workspace/{REPO}
+   - State dir: /shared/stardust-demo/
+   - Output contract: write status to /shared/stardust-demo/deploy-status.json
 
-## Step 5b — Commit all artifacts to the EDS repo under `deliverables/`
+   ## DA Auth
 
-Before deploying, commit all stardust artifacts to the EDS repo so they are accessible
-from the preview URL and version-controlled alongside the code.
+   - Get IMS token: DA_TOKEN=$(oauth-token adobe)
+   - Upload content via DA API (PUT admin.da.live/source/...)
+   - Trigger preview: POST admin.hlx.page/preview/{owner}/{repo}/{branch}/{page}
 
-```
-<eds-repo>/deliverables/<slug>/
-├── audit.md                  ← uplift-improvements.md (5 tensions)
-├── what-if-candidates.md     ← uplift-questions.md
-├── direction.md              ← variant directions + rationale
-├── PRODUCT.md                ← brand product description (current state)
-├── DESIGN.md                 ← brand design description (current state)
-├── brand-extraction.json     ← palette, type, motifs, voice
-├── brand-review.html         ← full brand review page
-├── state.json                ← stardust pipeline state
-├── home-A-proposed.html      ← variant A prototype
-├── home-B-proposed.html      ← variant B prototype
-├── home-C-proposed.html      ← variant C static prototype
-├── home-C-cinematic.html     ← variant C cinematic prototype
-├── variant-A.png             ← screenshot of variant A
-├── variant-B.png             ← screenshot of variant B
-└── variant-C.png             ← screenshot of variant C
-```
+   ## Git rules
 
-Copy from the stardust workspace:
-```bash
-mkdir -p <eds-repo>/deliverables/<slug>
-cp /workspace/stardust/uplift-improvements.md <eds-repo>/deliverables/<slug>/audit.md
-cp /workspace/stardust/uplift-questions.md    <eds-repo>/deliverables/<slug>/what-if-candidates.md
-cp /workspace/stardust/direction.md           <eds-repo>/deliverables/<slug>/direction.md
-cp /workspace/stardust/current/PRODUCT.md     <eds-repo>/deliverables/<slug>/PRODUCT.md
-cp /workspace/stardust/current/DESIGN.md      <eds-repo>/deliverables/<slug>/DESIGN.md
-cp /workspace/stardust/current/_brand-extraction.json <eds-repo>/deliverables/<slug>/brand-extraction.json
-cp /workspace/stardust/current/brand-review.html      <eds-repo>/deliverables/<slug>/brand-review.html
-cp /workspace/stardust/state.json             <eds-repo>/deliverables/<slug>/state.json
-cp /workspace/stardust/prototypes/home-A-proposed.html  <eds-repo>/deliverables/<slug>/
-cp /workspace/stardust/prototypes/home-B-proposed.html  <eds-repo>/deliverables/<slug>/
-cp /workspace/stardust/prototypes/home-C-proposed.html  <eds-repo>/deliverables/<slug>/
-cp /workspace/stardust/prototypes/home-C-cinematic.html <eds-repo>/deliverables/<slug>/
-cp /shared/<slug>-variant-A.png <eds-repo>/deliverables/<slug>/variant-A.png
-cp /shared/<slug>-variant-B.png <eds-repo>/deliverables/<slug>/variant-B.png
-cp /shared/<slug>-variant-C.png <eds-repo>/deliverables/<slug>/variant-C.png
+   - NEVER use `git add .` or `git add -A`
+   - One commit + one push at the end
 
-cd <eds-repo>
-git add deliverables/
-git commit -m "Add <slug> stardust deliverables — audit, brand review, 3 prototypes, screenshots"
-git push origin <branch>
-```
+   ## Naming questions
 
-Deliverables are then accessible at:
-`https://<branch>--<repo>--<org>.aem.page/deliverables/<slug>/brand-review.html`
+   If this is a multi-page deploy, you MUST ask naming questions.
+   Write them to /shared/stardust-demo/deploy-questions.json:
+   {"questions": ["question 1", "question 2", ...]}
+   Then STOP and wait for answers via feed_scoop.
 
-## Step 6 — Deploy the chosen variant
+   ## Output contract
 
-Once the user has picked a variant (A, B, or C), invoke `stardust:deploy` to convert the
-prototype HTML into a live Edge Delivery Services (AEM) site.
+   Write to /shared/stardust-demo/deploy-status.json:
+   {"status":"done","preview_url":"https://...","summary":"..."}
+   ```
+
+4. **If deploy asks naming questions:**
+   - Read `/shared/stardust-demo/deploy-questions.json`
+   - Present questions to the user in chat
+   - Feed answers back: `feed_scoop("{{SLUG}}-deploy", "Answers: ...")`
+
+5. On completion:
+   ```
+   sprinkle send {{SLUG}}-pipeline '{"step":"deploy","status":"done","summary":"Live at {{PREVIEW_URL}}","link":"{{PREVIEW_URL}}"}'
+   ```
+
+### Step 6 — Report
 
 ```
-stardust:deploy stardust/prototypes/home-<X>-proposed.html
+✓ Demo ready — {{URL}}
+
+Sprinkles open:
+  {{SLUG}}-pipeline       — live pipeline status
+  {{SLUG}}-audit          — 5 tensions found
+  {{SLUG}}-brand-review   — brand extraction
+  {{SLUG}}-variants       — 3 variants
+
+Deployed: {{PREVIEW_URL}}
 ```
 
-`stardust:deploy` owns:
-- Converting each prototype `<section>` into an EDS block (`blocks/<name>/<name>.js` + `.css`)
-- Authoring EDS content pages under `content/`
-- Static header/footer fragments at `fragments/header.html` + `fragments/footer.html`
-- Updating `styles/styles.css` with brand tokens
-- Self-hosting fonts with metric-matched fallbacks (zero CLS)
-- Deploying via DA Source API (`PUT admin.da.live/source/…`) + AEM preview/publish
-- Visual + structural diff validation against the original prototype
+## Re-run Behavior
 
-Trigger phrase for the user: "deploy variant B" or "let's go with B".
+If `/workspace/stardust/state.json` exists for the same URL:
+- Ask: "I have an existing uplift for `{{URL}}`. Re-run or reuse?"
+- If reuse: skip Step 2, go straight to Step 3 (sprinkle generation)
+- If re-run: clear `/workspace/stardust/` and start fresh
 
-## Saving to git
+## Lick Events
 
-After generating sprinkles, offer to push to the templates repo:
-```bash
-cp /shared/sprinkles/<slug>-variants/<slug>-variants.shtml /workspace/stardust-sprinkles/sprinkles/<slug>-variants-review.shtml
-# repeat for audit and brand-review
-cd /workspace/stardust-sprinkles && git add sprinkles/ && git commit -m "Add <slug> demo sprinkles" && git push
+| Lick | Source | Cone action |
+|------|--------|-------------|
+| `{action: "select-variant", variant: "A\|B\|C"}` | variants sprinkle | Confirm with user, spawn deploy |
+
+## Status Update Contract (cone → pipeline sprinkle)
+
+```json
+{"step": "<step-id>", "status": "active|done", "summary": "...", "link": "..."}
 ```
 
-## Design system
+Step IDs: `extract`, `audit`, `brand-review`, `direction`, `prototypes`, `deploy`
 
-All three sprinkles share the same stardust design token system. The canonical token set:
+## Design System
+
+All sprinkles use the stardust token set:
 
 ```css
 :root {
-  --ink: #0a1024;
   --bg: #f5f0e6;
   --surface: #fffdf8;
   --sunken: #ece4d2;
@@ -231,13 +307,3 @@ All three sprinkles share the same stardust design token system. The canonical t
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
 ```
-
-Never use S2 tokens in these sprinkles. The stardust design system is self-contained.
-
-## References
-
-- `/workspace/skills/stardust/SKILL.md` — master stardust skill
-- `/workspace/skills/stardust/skills/uplift/SKILL.md` — uplift pipeline
-- `/workspace/skills/stardust-demo/templates/` — sprinkle templates
-- `/workspace/stardust-sprinkles/` — git repo for storing demo sprinkles
-- `github.com/QuentinVecchio/stardust-sprinkles` — remote repo

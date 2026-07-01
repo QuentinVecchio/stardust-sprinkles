@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Brand Review · {{URL}}</title>
+  <title>Brand Review Â· {{URL}}</title>
   <link rel="icon" href="palette" />
   <style>
     :root {
@@ -17,18 +17,12 @@
       --fg-dim: rgba(26,31,56,0.52);
       --fg-faint: rgba(26,31,56,0.30);
       --hairline-soft: rgba(26,31,56,0.08);
-      --success: #5f9669;
       --display: "SF Pro Display", Inter, system-ui, sans-serif;
       --text: "SF Pro Text", Inter, system-ui, sans-serif;
       --mono: "SF Mono", "JetBrains Mono", ui-monospace, monospace;
-      --ease: cubic-bezier(0.16, 1, 0.3, 1);
     }
 
-    *, *::before, *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     html, body {
       height: 100%;
@@ -44,7 +38,6 @@
       font-family: var(--text);
     }
 
-    /* Sticky subheader */
     .subheader {
       flex-shrink: 0;
       height: 46px;
@@ -79,7 +72,6 @@
       font-weight: 400;
     }
 
-    /* iframe fills remaining space */
     .preview-frame {
       flex: 1;
       width: 100%;
@@ -100,5 +92,8 @@
     src="{{BRAND_REVIEW_URL}}"
     title="{{URL}} Brand Review"
   ></iframe>
+  <script>
+    slicc.on('update', function(data) {});
+  </script>
 </body>
 </html>

@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <link rel="icon" href="layout-panel-left" />
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>wknd · directions</title>
+  <title>{{SLUG}} · variants</title>
   <style>
     :root {
       --ink: #0a1024;
@@ -56,10 +56,8 @@
     .stagger > *:nth-child(2) { animation-delay: .10s; }
     .stagger > *:nth-child(3) { animation-delay: .16s; }
 
-    /* ── Shell ── */
     .wrap { display: flex; flex-direction: column; height: 100vh; }
 
-    /* ── Sticky subheader ── */
     .subheader {
       display: flex;
       align-items: center;
@@ -75,13 +73,9 @@
       z-index: 10;
     }
     .sub-left  { display: flex; align-items: center; gap: 10px; }
-    .sub-right { display: flex; align-items: center; }
     .eyebrow   { font: 500 11px/1 var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--amber-deep); }
     .sub-meta  { font-size: 13px; color: var(--fg-dim); }
-    .sub-hint  { font: 500 12px/1 var(--mono); color: var(--amber-deep); cursor: pointer; }
-    .sub-hint:hover { text-decoration: underline; }
 
-    /* ── Scrollable body ── */
     .body {
       flex: 1;
       overflow-y: auto;
@@ -146,7 +140,6 @@
       overflow: hidden;
       background: var(--surface);
       box-shadow: 0 2px 8px -4px rgba(26,31,56,0.12);
-      cursor: pointer;
       transition: transform .22s var(--ease), box-shadow .22s var(--ease);
       display: flex;
       flex-direction: column;
@@ -162,13 +155,13 @@
       box-shadow: 0 0 0 2px var(--amber), 0 22px 48px -18px rgba(201,130,45,0.45);
     }
 
-    /* Thumbnail */
     .thumb {
       aspect-ratio: 16/10;
       overflow: hidden;
       background: var(--paper);
       border-bottom: 1px solid var(--hairline-soft);
       flex: none;
+      cursor: pointer;
     }
     .thumb img {
       width: 100%;
@@ -178,7 +171,6 @@
       display: block;
     }
 
-    /* Card body */
     .meta {
       padding: 13px 14px 15px;
       display: flex;
@@ -214,7 +206,6 @@
       margin: 0;
     }
 
-    /* What if box */
     .whatif {
       background: rgba(201,130,45,0.08);
       border: 1px solid rgba(201,130,45,0.22);
@@ -236,14 +227,6 @@
       font-style: italic;
     }
 
-    /* Faithful line */
-    .faithful {
-      font: 500 12px/1.4 var(--mono);
-      color: var(--fg-dim);
-      padding: 4px 0;
-    }
-
-    /* Moves list */
     .moves {
       margin: 0;
       padding: 0;
@@ -268,7 +251,6 @@
     }
     .moves li.m .a { color: var(--amber-deep); flex: none; }
 
-    /* Role */
     .role {
       margin-top: 2px;
       font: 500 11px/1 var(--mono);
@@ -278,7 +260,6 @@
       border-top: 1px solid var(--hairline-soft);
     }
 
-    /* Rec pill */
     .recpill {
       position: absolute;
       top: 10px;
@@ -293,123 +274,175 @@
       border-radius: 6px;
       box-shadow: inset 0 0 0 1px rgba(201,130,45,0.5);
     }
+
+    /* ── Deploy button ── */
+    .deploy-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 4px;
+      padding: 9px 14px;
+      border: 1px solid var(--hairline);
+      border-radius: 9px;
+      background: var(--bg);
+      font: 600 12px/1 var(--mono);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--fg-dim);
+      cursor: pointer;
+      transition: all .18s var(--ease);
+    }
+    .deploy-btn:hover {
+      background: var(--amber);
+      color: var(--ink);
+      border-color: var(--amber);
+    }
+    .deploy-btn.selected {
+      background: var(--success);
+      color: #fff;
+      border-color: var(--success);
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
 <div class="wrap">
 
-  <!-- Sticky subheader -->
   <div class="subheader">
     <div class="sub-left">
       <span class="eyebrow">directions</span>
       <span class="sub-meta">3 variants · brand-faithful</span>
     </div>
-    <div class="sub-right"></div>
   </div>
 
-  <!-- Scrollable body -->
   <div class="body">
 
-    <!-- Shared fixes banner -->
     <div class="shared fade">
       <div class="sh">
         <span class="e">all three fix</span>
-        <span class="t"><b>5 tensions</b> resolved across every variant</span>
+        <span class="t"><b id="fix-count"></b> tensions resolved across every variant</span>
       </div>
-      <div class="fixchips">
-        <span class="fixchip"><span class="ck">✓</span> carousel → single hero</span>
-        <span class="fixchip"><span class="ck">✓</span> search elevated to hero</span>
-        <span class="fixchip"><span class="ck">✓</span> Asar promoted to headings</span>
-        <span class="fixchip"><span class="ck">✓</span> card rails differentiated</span>
-        <span class="fixchip"><span class="ck">✓</span> photography at proper scale</span>
-      </div>
+      <div class="fixchips" id="fixchips"></div>
     </div>
 
-    <!-- 3-col gallery -->
-    <div class="gallery stagger">
+    <div class="gallery stagger" id="gallery"></div>
 
-      <!-- Card A -->
-      <div class="vcard" data-url="{{VARIANT_A_URL}}">
-        <div class="thumb">
-          <img src="{{SCREENSHOT_A}}" alt="Variant A" loading="lazy" />
-        </div>
-        <div class="meta">
-          <div class="top">
-            <span class="k">A</span>
-            <span class="ttl">Faithful + fixes</span>
-          </div>
-          <p class="pitch">Your site tomorrow — same IA, the obvious fixes. The risk-averse green-light.</p>
-          <div class="faithful">no new bet · the 5 fixes, nothing else moves</div>
-          <ul class="moves">
-            <li class="ml">composition</li>
-            <li class="m"><span class="a">→</span> carousel replaced with single hero</li>
-            <li class="m"><span class="a">→</span> search field elevated to hero-adjacency</li>
-          </ul>
-          <div class="role">static · green-light pick</div>
-        </div>
-      </div>
-
-      <!-- Card B — Recommended -->
-      <div class="vcard rec" data-url="{{VARIANT_B_URL}}">
-        <span class="recpill">★ recommended</span>
-        <div class="thumb">
-          <img src="{{SCREENSHOT_B}}" alt="Variant B" loading="lazy" />
-        </div>
-        <div class="meta">
-          <div class="top">
-            <span class="k">B</span>
-            <span class="ttl">Amplify the photography</span>
-          </div>
-          <p class="pitch">The brand's most ownable asset, foregrounded — from thumbnail crop to the whole canvas.</p>
-          <div class="whatif">
-            <span class="q">what if</span>
-            <span class="qt">photography &amp; the portrait 2:3 grid owned the page, not a thin card strip?</span>
-          </div>
-          <ul class="moves">
-            <li class="ml">composition</li>
-            <li class="m"><span class="a">→</span> 2-column portrait grid, title overlay on image</li>
-            <li class="m"><span class="a">→</span> featured article as 60/40 editorial bleed</li>
-            <li class="m"><span class="a">→</span> photography as primary design voice</li>
-          </ul>
-          <div class="role">static · brand exploration</div>
-        </div>
-      </div>
-
-      <!-- Card C -->
-      <div class="vcard" data-url="{{VARIANT_C_URL}}">
-        <div class="thumb">
-          <img src="{{SCREENSHOT_C}}" alt="Variant C" loading="lazy" />
-        </div>
-        <div class="meta">
-          <div class="top">
-            <span class="k">C</span>
-            <span class="ttl">Motion as identity</span>
-          </div>
-          <p class="pitch">The site gains a third dimension — editorial cinematic register.</p>
-          <div class="whatif">
-            <span class="q">what if</span>
-            <span class="qt">motion was woven into the brand identity — not decoration but voice?</span>
-          </div>
-          <ul class="moves">
-            <li class="ml">motion</li>
-            <li class="m"><span class="a">→</span> hero micro-parallax at editorial pace</li>
-            <li class="m"><span class="a">→</span> section titles fade in at reading pace</li>
-            <li class="m"><span class="a">→</span> card hover: gentle scale 1.02 at 900ms</li>
-          </ul>
-          <div class="role">cinematic · visionary pick</div>
-        </div>
-      </div>
-
-    </div><!-- /gallery -->
-  </div><!-- /body -->
-</div><!-- /wrap -->
+  </div>
+</div>
 
 <script>
-  setTimeout(() => document.body.classList.add('ready'), 50);
-  document.querySelectorAll('.vcard[data-url]').forEach(c => {
-    c.addEventListener('click', () => window.open(c.dataset.url, '_blank'));
+  var VARIANTS = [
+    {
+      key: 'A',
+      url: '{{VARIANT_A_URL}}',
+      screenshot: '{{SCREENSHOT_A}}',
+      title: '{{VARIANT_A_TITLE}}',
+      pitch: '{{VARIANT_A_PITCH}}',
+      whatif: '{{VARIANT_A_WHATIF}}',
+      moves: {{VARIANT_A_MOVES_JSON}},
+      role: '{{VARIANT_A_ROLE}}'
+    },
+    {
+      key: 'B',
+      url: '{{VARIANT_B_URL}}',
+      screenshot: '{{SCREENSHOT_B}}',
+      title: '{{VARIANT_B_TITLE}}',
+      pitch: '{{VARIANT_B_PITCH}}',
+      whatif: '{{VARIANT_B_WHATIF}}',
+      moves: {{VARIANT_B_MOVES_JSON}},
+      role: '{{VARIANT_B_ROLE}}'
+    },
+    {
+      key: 'C',
+      url: '{{VARIANT_C_URL}}',
+      screenshot: '{{SCREENSHOT_C}}',
+      title: '{{VARIANT_C_TITLE}}',
+      pitch: '{{VARIANT_C_PITCH}}',
+      whatif: '{{VARIANT_C_WHATIF}}',
+      moves: {{VARIANT_C_MOVES_JSON}},
+      role: '{{VARIANT_C_ROLE}}'
+    }
+  ];
+
+  var FIXES = {{FIXES_JSON}};
+  var RECOMMENDED = '{{RECOMMENDED}}';
+  var selectedVariant = null;
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function renderFixes() {
+    document.getElementById('fix-count').textContent = FIXES.length + '';
+    var el = document.getElementById('fixchips');
+    el.innerHTML = FIXES.map(function(f) {
+      return '<span class="fixchip"><span class="ck">✓</span> ' + escHtml(f) + '</span>';
+    }).join('');
+  }
+
+  function renderGallery() {
+    var gallery = document.getElementById('gallery');
+    gallery.innerHTML = '';
+
+    VARIANTS.forEach(function(v) {
+      var isRec = v.key === RECOMMENDED;
+      var isSelected = v.key === selectedVariant;
+
+      var movesHtml = '';
+      if (v.moves && v.moves.length) {
+        movesHtml = '<ul class="moves"><li class="ml">composition</li>' +
+          v.moves.map(function(m) {
+            return '<li class="m"><span class="a">→</span> ' + escHtml(m) + '</li>';
+          }).join('') + '</ul>';
+      }
+
+      var whatifHtml = '';
+      if (v.whatif) {
+        whatifHtml = '<div class="whatif"><span class="q">what if</span><span class="qt">' + escHtml(v.whatif) + '</span></div>';
+      }
+
+      var btnClass = 'deploy-btn' + (isSelected ? ' selected' : '');
+      var btnLabel = isSelected ? '✓ selected' : 'deploy this →';
+
+      var html = '<div class="vcard' + (isRec ? ' rec' : '') + '">' +
+        (isRec ? '<span class="recpill">★ recommended</span>' : '') +
+        '<div class="thumb" onclick="window.open(\'' + escHtml(v.url) + '\', \'_blank\')"><img src="' + escHtml(v.screenshot) + '" alt="Variant ' + v.key + '" loading="lazy" /></div>' +
+        '<div class="meta">' +
+          '<div class="top"><span class="k">' + v.key + '</span><span class="ttl">' + escHtml(v.title) + '</span></div>' +
+          '<p class="pitch">' + escHtml(v.pitch) + '</p>' +
+          whatifHtml +
+          movesHtml +
+          '<div class="role">' + escHtml(v.role) + '</div>' +
+          '<button class="' + btnClass + '" data-variant="' + v.key + '">' + btnLabel + '</button>' +
+        '</div>' +
+      '</div>';
+
+      gallery.insertAdjacentHTML('beforeend', html);
+    });
+  }
+
+  function handleDeploy(e) {
+    var btn = e.target.closest('.deploy-btn');
+    if (!btn || selectedVariant) return;
+    var variant = btn.getAttribute('data-variant');
+    selectedVariant = variant;
+    renderGallery();
+    slicc.lick({ action: 'select-variant', variant: variant });
+  }
+
+  renderFixes();
+  renderGallery();
+
+  document.getElementById('gallery').addEventListener('click', handleDeploy);
+
+  setTimeout(function() { document.body.classList.add('ready'); }, 50);
+
+  slicc.on('update', function(data) {
+    if (data && data.action === 'deploy-confirmed') {
+      // Already handled by button state
+    }
   });
-  slicc.on('update', function(data) {});
 </script>
 </body>
 </html>

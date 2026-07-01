@@ -45,7 +45,6 @@
       overflow: hidden;
     }
 
-    /* ── Sticky subheader ── */
     .subheader {
       flex-shrink: 0;
       display: flex;
@@ -94,7 +93,6 @@
       white-space: nowrap;
     }
 
-    /* ── Scrollable body ── */
     .scroll-body {
       flex: 1;
       overflow-y: auto;
@@ -104,7 +102,6 @@
       gap: 10px;
     }
 
-    /* ── Tension card ── */
     .tension-card {
       background: var(--surface);
       border: 1px solid var(--hairline-soft);
@@ -112,7 +109,7 @@
       padding: 16px 18px;
       box-shadow: 0 1px 2px rgba(26,31,56,0.04);
       position: relative;
-      padding-left: 22px; /* extra left room for accent bar */
+      padding-left: 22px;
       overflow: hidden;
     }
 
@@ -126,7 +123,6 @@
       border-radius: 13px 0 0 13px;
     }
 
-    /* Category accent colors */
     .tension-card--dated-pattern::before  { background: var(--danger); }
     .tension-card--ia-clutter::before     { background: var(--amber-deep); }
     .tension-card--density::before        { background: var(--fg-dim); }
@@ -150,7 +146,6 @@
       flex-shrink: 0;
     }
 
-    /* Category tag pills */
     .tag {
       display: inline-block;
       font-family: var(--mono);
@@ -199,7 +194,6 @@
       line-height: 1.6;
     }
 
-    /* ── Stagger animation ── */
     @keyframes riseIn {
       from { opacity: 0; transform: translateY(8px); }
       to   { opacity: 1; transform: none; }
@@ -219,7 +213,6 @@
     .stagger > *:nth-child(4) { animation-delay: .22s; }
     .stagger > *:nth-child(5) { animation-delay: .28s; }
 
-    /* ── Scrollbar ── */
     .scroll-body::-webkit-scrollbar { width: 6px; }
     .scroll-body::-webkit-scrollbar-track { background: transparent; }
     .scroll-body::-webkit-scrollbar-thumb { background: var(--hairline); border-radius: 999px; }
@@ -227,76 +220,57 @@
 </head>
 <body>
 
-  <!-- Sticky subheader -->
   <header class="subheader">
     <span class="subheader__eyebrow">Audit</span>
     <span class="subheader__sep"></span>
     <span class="subheader__site">{{URL}}</span>
     <span class="subheader__spacer"></span>
-    <span class="subheader__pill">5 tensions found</span>
+    <span class="subheader__pill" id="count-pill"></span>
   </header>
 
-  <!-- Scrollable card list -->
   <div class="scroll-body">
-    <div class="stagger" id="cards">
-
-      <!-- 1. Dated Pattern -->
-      <article class="tension-card tension-card--dated-pattern">
-        <div class="tension-card__top">
-          <span class="tag tag--dated-pattern">Dated Pattern</span>
-          <span class="tension-card__number">01</span>
-        </div>
-        <h2 class="tension-card__title">Auto-advancing carousel hero reads as 2019 CMS template</h2>
-        <p class="tension-card__body">The three-slide hero carousel (5000ms auto-advance, hard-cut transitions, text overlaid on image with a band of yellow) is the signature layout of every AEM/WordPress landing page from 2018–2020. Modern adventure brands (REI, Patagonia, Komoot) have moved to a single full-viewport hero image with scroll-driven reveal or a stacked editorial hero. The carousel also creates a CTA-type inconsistency ("View Trips" for an adventure vs "Full Article" for magazine content on slides 2–3) that erodes first-impression clarity.</p>
-      </article>
-
-      <!-- 2. IA / Clutter -->
-      <article class="tension-card tension-card--ia-clutter">
-        <div class="tension-card__top">
-          <span class="tag tag--ia-clutter">IA / Clutter</span>
-          <span class="tension-card__number">02</span>
-        </div>
-        <h2 class="tension-card__title">Discovery entry-point buried at the bottom of the page</h2>
-        <p class="tension-card__body">"Where do you want to go?" (the keyword search field) is the fifth and final content section, positioned below two identical horizontal card rails. The primary intent of an adventure-travel visitor — finding and booking a trip — has the page's lowest real-estate priority. Above-the-fold contains only the rotating carousel with no immediate invitation to explore the catalogue.</p>
-      </article>
-
-      <!-- 3. Density -->
-      <article class="tension-card tension-card--density">
-        <div class="tension-card__top">
-          <span class="tag tag--density">Density</span>
-          <span class="tension-card__number">03</span>
-        </div>
-        <h2 class="tension-card__title">Two structurally identical card rails create density without hierarchy</h2>
-        <p class="tension-card__body">Section 3 ("Recent Articles") and Section 4 ("Next Adventures") both use the exact same 4-up image-list rail component with the same visual weight, same card proportions, same heading treatment (Source Sans Pro 600 underline). There is no typographic, chromatic, or spatial differentiation between editorial content and bookable trips. The page density results in the featured article and featured adventure competing — two full-width featured teasers flank the identical rails with no breathing room.</p>
-      </article>
-
-      <!-- 4. Cliché -->
-      <article class="tension-card tension-card--cliche">
-        <div class="tension-card__top">
-          <span class="tag tag--cliche">Cliché</span>
-          <span class="tension-card__number">04</span>
-        </div>
-        <h2 class="tension-card__title">Photography cropped to thumbnails defeats the brand's primary visual asset</h2>
-        <p class="tension-card__body">The page carries high-quality adventure photography (1180–1620px natural width) but renders 6 of 9 below-fold images at approximately 300px card thumbnail size. Every competitor in the adventure space uses oversized, edge-to-edge photography as its primary brand differentiator. Cropping Dolomites skiing, Australian bush, and New Zealand climbing photography to 300px thumbnail cards negates their power and makes WKND read like a news aggregator rather than an experiential travel brand.</p>
-      </article>
-
-      <!-- 5. Missed Opportunity -->
-      <article class="tension-card tension-card--missed-opportunity">
-        <div class="tension-card__top">
-          <span class="tag tag--missed-opportunity">Missed Opportunity</span>
-          <span class="tension-card__number">05</span>
-        </div>
-        <h2 class="tension-card__title">Asar's display serif character is suppressed below structural voice</h2>
-        <p class="tension-card__body">Asar (a distinctive contrast serif loaded via Google Fonts) is used on exactly 3 elements on the homepage: the h2 titles in the hero carousel slides. All section titles, navigation, and CTAs use Source Sans Pro. The captured brand already owns a strong editorial display typeface that's never promoted to structural scope. Extending Asar to section titles, the featured article heading, and key display moments would give WKND a typographic personality that no AEM reference site currently has.</p>
-      </article>
-
-    </div>
+    <div class="stagger" id="cards"></div>
   </div>
 
   <script>
-    setTimeout(function () {
-      document.body.classList.add('ready');
-    }, 50);
+    var TENSIONS = {{TENSIONS_JSON}};
+
+    var CATEGORY_LABELS = {
+      'dated-pattern': 'Dated Pattern',
+      'ia-clutter': 'IA / Clutter',
+      'density': 'Density',
+      'cliche': 'Cliché',
+      'missed-opportunity': 'Missed Opportunity'
+    };
+
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function renderCards() {
+      var container = document.getElementById('cards');
+      container.innerHTML = '';
+
+      document.getElementById('count-pill').textContent = TENSIONS.length + ' tensions found';
+
+      TENSIONS.forEach(function(t, i) {
+        var cat = t.category || 'density';
+        var html = '<article class="tension-card tension-card--' + cat + '">' +
+          '<div class="tension-card__top">' +
+            '<span class="tag tag--' + cat + '">' + escHtml(CATEGORY_LABELS[cat] || cat) + '</span>' +
+            '<span class="tension-card__number">' + String(i + 1).padStart(2, '0') + '</span>' +
+          '</div>' +
+          '<h2 class="tension-card__title">' + escHtml(t.title) + '</h2>' +
+          '<p class="tension-card__body">' + escHtml(t.body) + '</p>' +
+        '</article>';
+        container.insertAdjacentHTML('beforeend', html);
+      });
+    }
+
+    renderCards();
+    setTimeout(function() { document.body.classList.add('ready'); }, 50);
+
+    slicc.on('update', function(data) {});
   </script>
 </body>
 </html>
