@@ -331,42 +331,16 @@
   </div>
 </div>
 
-<script>
-  var VARIANTS = [
-    {
-      key: 'A',
-      url: '{{VARIANT_A_URL}}',
-      screenshot: '{{SCREENSHOT_A}}',
-      title: '{{VARIANT_A_TITLE}}',
-      pitch: '{{VARIANT_A_PITCH}}',
-      whatif: '{{VARIANT_A_WHATIF}}',
-      moves: {{VARIANT_A_MOVES_JSON}},
-      role: '{{VARIANT_A_ROLE}}'
-    },
-    {
-      key: 'B',
-      url: '{{VARIANT_B_URL}}',
-      screenshot: '{{SCREENSHOT_B}}',
-      title: '{{VARIANT_B_TITLE}}',
-      pitch: '{{VARIANT_B_PITCH}}',
-      whatif: '{{VARIANT_B_WHATIF}}',
-      moves: {{VARIANT_B_MOVES_JSON}},
-      role: '{{VARIANT_B_ROLE}}'
-    },
-    {
-      key: 'C',
-      url: '{{VARIANT_C_URL}}',
-      screenshot: '{{SCREENSHOT_C}}',
-      title: '{{VARIANT_C_TITLE}}',
-      pitch: '{{VARIANT_C_PITCH}}',
-      whatif: '{{VARIANT_C_WHATIF}}',
-      moves: {{VARIANT_C_MOVES_JSON}},
-      role: '{{VARIANT_C_ROLE}}'
-    }
-  ];
+<!-- Data island: all variant data as a single JSON object, safe from shell escaping -->
+<script id="variants-data" type="application/json">
+{{VARIANTS_JSON}}
+</script>
 
-  var FIXES = {{FIXES_JSON}};
-  var RECOMMENDED = '{{RECOMMENDED}}';
+<script>
+  var DATA = JSON.parse(document.getElementById('variants-data').textContent);
+  var VARIANTS = DATA.variants;
+  var FIXES = DATA.fixes;
+  var RECOMMENDED = DATA.recommended;
   var selectedVariant = null;
 
   function escHtml(s) {
@@ -438,11 +412,7 @@
 
   setTimeout(function() { document.body.classList.add('ready'); }, 50);
 
-  slicc.on('update', function(data) {
-    if (data && data.action === 'deploy-confirmed') {
-      // Already handled by button state
-    }
-  });
+  slicc.on('update', function(data) {});
 </script>
 </body>
 </html>

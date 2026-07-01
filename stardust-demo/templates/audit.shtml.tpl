@@ -232,8 +232,13 @@
     <div class="stagger" id="cards"></div>
   </div>
 
+  <!-- Data island: raw JSON, no escaping issues with shell tools -->
+  <script id="tensions-data" type="application/json">
+{{TENSIONS_JSON}}
+  </script>
+
   <script>
-    var TENSIONS = {{TENSIONS_JSON}};
+    var TENSIONS = JSON.parse(document.getElementById('tensions-data').textContent);
 
     var CATEGORY_LABELS = {
       'dated-pattern': 'Dated Pattern',

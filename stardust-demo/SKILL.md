@@ -111,25 +111,29 @@ sprinkle send {{SLUG}}-pipeline '{"step":"brand-review","status":"active","summa
 
 Then OPEN the audit sprinkle:
 1. Read /workspace/stardust/uplift-improvements.md
-2. Parse 5 tensions into JSON: [{"category":"...","title":"...","body":"..."},...]
+2. Parse 5 tensions into JSON array: [{"category":"...","title":"...","body":"..."},...]
    Valid categories: dated-pattern, ia-clutter, density, cliche, missed-opportunity
 3. Read /workspace/skills/stardust-demo/templates/audit.shtml.tpl
-4. Replace {{URL}} with "{{URL}}", {{SLUG}} with "{{SLUG}}", {{TENSIONS_JSON}} with the JSON array
-5. mkdir -p /shared/sprinkles/{{SLUG}}-audit
-6. Write populated template to /shared/sprinkles/{{SLUG}}-audit/{{SLUG}}-audit.shtml
-7. Run: sprinkle open {{SLUG}}-audit
+4. Replace {{URL}} and {{SLUG}} with their values
+5. Replace {{TENSIONS_JSON}} with the raw JSON array (it sits inside a
+   <script type="application/json"> data island — no escaping needed, just paste the JSON)
+6. mkdir -p /shared/sprinkles/{{SLUG}}-audit
+7. Write populated template to /shared/sprinkles/{{SLUG}}-audit/{{SLUG}}-audit.shtml
+8. Run: sprinkle open {{SLUG}}-audit
 
 ### After BRAND-REVIEW completes:
 sprinkle send {{SLUG}}-pipeline '{"step":"brand-review","status":"done","summary":"Palette + type extracted"}'
 sprinkle send {{SLUG}}-pipeline '{"step":"direction","status":"active","summary":"Defining variant directions..."}'
 
 Then OPEN the brand review sprinkle:
-1. Serve: open /workspace/stardust/current/brand-review.html → capture the preview URL
-2. Read /workspace/skills/stardust-demo/templates/brand-review.shtml.tpl
-3. Replace {{URL}} with "{{URL}}", {{BRAND_REVIEW_URL}} with the preview URL
-4. mkdir -p /shared/sprinkles/{{SLUG}}-brand-review
-5. Write to /shared/sprinkles/{{SLUG}}-brand-review/{{SLUG}}-brand-review.shtml
-6. Run: sprinkle open {{SLUG}}-brand-review
+1. Copy brand review to /shared/ (followers can't access /workspace/):
+   cp /workspace/stardust/current/brand-review.html /shared/{{SLUG}}-brand-review.html
+2. Serve from /shared/: open /shared/{{SLUG}}-brand-review.html → capture the preview URL
+3. Read /workspace/skills/stardust-demo/templates/brand-review.shtml.tpl
+4. Replace {{URL}} and {{BRAND_REVIEW_URL}} with their values
+5. mkdir -p /shared/sprinkles/{{SLUG}}-brand-review
+6. Write to /shared/sprinkles/{{SLUG}}-brand-review/{{SLUG}}-brand-review.shtml
+7. Run: sprinkle open {{SLUG}}-brand-review
 
 ### After DIRECTION completes:
 sprinkle send {{SLUG}}-pipeline '{"step":"direction","status":"done","summary":"3 variant directions resolved"}'
@@ -139,24 +143,46 @@ sprinkle send {{SLUG}}-pipeline '{"step":"prototypes","status":"active","summary
 sprinkle send {{SLUG}}-pipeline '{"step":"prototypes","status":"done","summary":"3 variants ready for review"}'
 
 Then OPEN the variants sprinkle:
-1. Serve all 3 prototypes:
-   open /workspace/stardust/prototypes/home-A-proposed.html
-   open /workspace/stardust/prototypes/home-B-proposed.html
-   open /workspace/stardust/prototypes/home-C-cinematic.html
-2. Take screenshots via playwright-cli screenshot of each
-3. Serve screenshots: open /shared/{{SLUG}}-variant-A.png etc.
-4. Read /workspace/stardust/direction.md — extract variant titles, pitches, what-if questions, moves, roles, which is recommended, shared fixes
-5. Read /workspace/skills/stardust-demo/templates/variants.shtml.tpl
-6. Replace all placeholders:
-   - {{URL}}, {{SLUG}}
-   - {{SCREENSHOT_A}}, {{SCREENSHOT_B}}, {{SCREENSHOT_C}} — served screenshot URLs
-   - {{VARIANT_A_URL}}, {{VARIANT_B_URL}}, {{VARIANT_C_URL}} — served prototype URLs
-   - {{VARIANT_A_TITLE}}, {{VARIANT_A_PITCH}}, {{VARIANT_A_WHATIF}}, {{VARIANT_A_MOVES_JSON}}, {{VARIANT_A_ROLE}}
-   - Same for B and C
-   - {{FIXES_JSON}} — JSON array of shared fix strings
-   - {{RECOMMENDED}} — letter of recommended variant (A, B, or C)
-7. mkdir -p /shared/sprinkles/{{SLUG}}-variants
-8. Write to /shared/sprinkles/{{SLUG}}-variants/{{SLUG}}-variants.shtml
+1. Copy prototypes to /shared/ (followers can't access /workspace/):
+   cp /workspace/stardust/prototypes/home-A-proposed.html /shared/{{SLUG}}-variant-A.html
+   cp /workspace/stardust/prototypes/home-B-proposed.html /shared/{{SLUG}}-variant-B.html
+   cp /workspace/stardust/prototypes/home-C-cinematic.html /shared/{{SLUG}}-variant-C.html
+2. Serve all 3 from /shared/:
+   open /shared/{{SLUG}}-variant-A.html → capture URL as VARIANT_A_URL
+   open /shared/{{SLUG}}-variant-B.html → capture URL as VARIANT_B_URL
+   open /shared/{{SLUG}}-variant-C.html → capture URL as VARIANT_C_URL
+3. Take screenshots via playwright-cli screenshot of each
+4. Serve screenshots: open /shared/{{SLUG}}-variant-A.png etc. → capture URLs
+5. Read /workspace/stardust/direction.md — extract:
+   - Per variant: key (A/B/C), title, pitch, what-if question, moves array, role
+   - Which variant is recommended
+   - Shared fixes across all variants
+6. Read /workspace/skills/stardust-demo/templates/variants.shtml.tpl
+7. Replace {{URL}} and {{SLUG}} with their values
+8. Replace {{VARIANTS_JSON}} with a single JSON object inside the data island
+   (no escaping needed — it's inside <script type="application/json">):
+   ```json
+   {
+     "variants": [
+       {
+         "key": "A",
+         "url": "<VARIANT_A_URL>",
+         "screenshot": "<SCREENSHOT_A_URL>",
+         "title": "...",
+         "pitch": "...",
+         "whatif": "...",
+         "moves": ["move 1", "move 2"],
+         "role": "..."
+       },
+       { "key": "B", ... },
+       { "key": "C", ... }
+     ],
+     "fixes": ["fix 1", "fix 2", ...],
+     "recommended": "B"
+   }
+   ```
+9. mkdir -p /shared/sprinkles/{{SLUG}}-variants
+10. Write to /shared/sprinkles/{{SLUG}}-variants/{{SLUG}}-variants.shtml
 9. Run: sprinkle open {{SLUG}}-variants
 ```
 
