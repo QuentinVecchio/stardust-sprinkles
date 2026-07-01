@@ -12,11 +12,13 @@ user-invocable: true
 
 One URL in. Four sprinkles open. A deployed EDS site out.
 
-Orchestrates `stardust:uplift` → deliverables to EDS → sprinkle opening → user variant selection → `stardust:deploy` inside SLICC.
+Orchestrates `stardust:uplift` (split across multiple scoops) → deliverables to EDS → sprinkle opening → user variant selection → `stardust:deploy` inside SLICC.
 
 ## Prerequisites
 
 - `stardust` skill installed (`upskill adobe/skills --skill stardust`)
+- `stardust:uplift` sub-skill installed (`upskill adobe/skills --skill uplift`)
+- `stardust:deploy` sub-skill installed (`upskill adobe/skills --skill deploy`)
 - `impeccable` skill installed (`upskill pbakaus/impeccable`)
 - DA token available via `oauth-token adobe`
 - GitHub access configured by the Stardust Lab
@@ -34,23 +36,24 @@ Derive from URL hostname + 4 random hex chars:
 
 Strip `www.`, take first segment before `.`, lowercase, append `-$(openssl rand -hex 2)`.
 
-## Key Rules for Follower-Facing Demos
+## Key Rules
 
-- **Never reference `/workspace/` or `sliccy.ai/preview/` in anything a follower sees**
-- Use EDS URLs (`https://{branch}--{repo}--{owner}.aem.page/deliverables/...`) for public access
-- Always mint fresh sprinkle names per demo (never reuse)
-- Commit deliverables to EDS BEFORE opening sprinkles that reference them
-- Sprinkles are thin chrome (subheader + iframe or interactive UI) — content lives on EDS
+- **Never reference `/workspace/` or `file://` in anything a follower sees** — use EDS URLs
+- **Cone owns ALL `sprinkle send` calls** — never delegate pipeline updates to scoops
+- **Always mint fresh sprinkle names** per demo — never reuse/overwrite
+- **Commit deliverables to EDS BEFORE opening sprinkles** that reference them
+- **Screenshots via live EDS URLs** — never `file://` paths, never `/workspace/` paths
+- **Embed screenshots as base64 data URIs** in the variants sprinkle (max-width 480, keep total .shtml under 350KB)
+- **Lick payloads use `{action, data: {}}`** — extra sibling keys get stripped by the bridge
+- **Cherry followers can't open URLs from sprinkles** — use chat-based fallback (cone posts clickable URL)
 
 ## CRITICAL — Pipeline Sprinkle Updates
 
-The pipeline sprinkle is the user's only window into what's happening. It MUST be updated in real time.
+The cone owns ALL pipeline updates. NEVER delegate `sprinkle send` to a working scoop — scoops are too busy with their main work and will skip or forget updates.
 
-**During uplift:** the uplift scoop itself pushes status updates to the pipeline sprinkle. The cone does NOT need to wake up for this — the scoop handles it directly via `sprinkle send`.
-
-**During deliverables/sprinkles:** the cone pushes status as it builds and commits deliverables.
-
-**During deploy:** the cone pushes `active` before spawning the deploy scoop, and `done` when it completes.
+The cone pushes status updates between scoops:
+- After spawning a scoop: push `active` for the current phase
+- After a scoop completes: push `done` for completed phases, then `active` for the next
 
 Format: `sprinkle send {{SLUG}}-pipeline '{"step":"<id>","status":"active|done","summary":"...","link":"..."}'`
 
@@ -65,19 +68,19 @@ Step IDs in order: `extract`, `audit`, `brand-review`, `direction`, `prototypes`
 3. Replace `{{URL}}` and `{{SLUG}}`
 4. Write to `/shared/sprinkles/{{SLUG}}-pipeline/{{SLUG}}-pipeline.shtml`
 5. Run: `sprinkle open {{SLUG}}-pipeline`
-6. Push initial status IMMEDIATELY — the user must see activity from the first second:
+6. Push initial status:
    ```
    sprinkle send {{SLUG}}-pipeline '{"step":"extract","status":"active","summary":"Crawling homepage..."}'
    ```
 
-### Step 2 — Run uplift (scoop)
+### Step 2 — Uplift Phase 1: Extract + Audit + Brand Review (scoop)
 
-Spawn the uplift scoop:
+Spawn the first uplift scoop:
 
 ```
 scoop_scoop({
-  name: "{{SLUG}}-uplift",
-  writablePaths: ["/scoops/{{SLUG}}-uplift/", "/shared/", "/workspace/stardust/"]
+  name: "{{SLUG}}-uplift-1",
+  writablePaths: ["/scoops/{{SLUG}}-uplift-1/", "/shared/", "/workspace/stardust/"]
 })
 ```
 
@@ -87,49 +90,94 @@ Feed the scoop:
 ## STEP 1 — MANDATORY
 
 Run: read_file /workspace/skills/stardust/skills/uplift/SKILL.md
-Then follow those instructions EXACTLY for URL: {{URL}}
+Then follow those instructions for URL: {{URL}}
+
+## IMPORTANT — SCOPE LIMIT
+
+You are responsible for the FIRST 3 PHASES ONLY:
+1. Extract (crawl + capture)
+2. Audit (identify design tensions)
+3. Brand Review (extract palette, type, motifs)
+
+STOP after brand-review completes. Do NOT proceed to direction or prototypes.
+Write a completion marker when done:
+  echo '{"phase":"brand-review","status":"done"}' > /shared/stardust-demo/uplift-1-done.json
 
 ## Context
 
 - URL: {{URL}}
 - Slug: {{SLUG}}
 - State dir: /workspace/stardust/
-- Pipeline sprinkle: {{SLUG}}-pipeline
 
 ## DA Auth
 
 - Get IMS token: DA_TOKEN=$(oauth-token adobe)
+```
 
-## CRITICAL — Pipeline status updates
-
-You MUST push status updates to the pipeline sprinkle after EVERY phase.
-Do NOT batch. Do NOT wait until the end. Push after EACH phase completes.
-
-### After EXTRACT completes:
+**When scoop completes, the cone pushes updates:**
+```
 sprinkle send {{SLUG}}-pipeline '{"step":"extract","status":"done","summary":"Homepage crawled"}'
-sprinkle send {{SLUG}}-pipeline '{"step":"audit","status":"active","summary":"Analyzing design tensions..."}'
-
-### After AUDIT completes:
 sprinkle send {{SLUG}}-pipeline '{"step":"audit","status":"done","summary":"5 tensions identified"}'
-sprinkle send {{SLUG}}-pipeline '{"step":"brand-review","status":"active","summary":"Extracting brand surface..."}'
-
-### After BRAND-REVIEW completes:
 sprinkle send {{SLUG}}-pipeline '{"step":"brand-review","status":"done","summary":"Palette + type extracted"}'
 sprinkle send {{SLUG}}-pipeline '{"step":"direction","status":"active","summary":"Defining variant directions..."}'
+```
 
-### After DIRECTION completes:
+### Step 3 — Uplift Phase 2: Direction + Prototypes (scoop)
+
+Spawn the second uplift scoop:
+
+```
+scoop_scoop({
+  name: "{{SLUG}}-uplift-2",
+  writablePaths: ["/scoops/{{SLUG}}-uplift-2/", "/shared/", "/workspace/stardust/"]
+})
+```
+
+Feed the scoop:
+
+```
+## STEP 1 — MANDATORY
+
+Run: read_file /workspace/skills/stardust/skills/uplift/SKILL.md
+Then follow those instructions for URL: {{URL}}
+
+## IMPORTANT — SCOPE LIMIT
+
+The first 3 phases (extract, audit, brand-review) are ALREADY DONE.
+Their outputs are in /workspace/stardust/. Do NOT re-run them.
+
+You are responsible for the LAST 2 PHASES ONLY:
+4. Direction (define 3 variant directions from the audit + brand review)
+5. Prototypes (generate 3 HTML variant prototypes)
+
+Write a completion marker when done:
+  echo '{"phase":"prototypes","status":"done"}' > /shared/stardust-demo/uplift-2-done.json
+
+## Context
+
+- URL: {{URL}}
+- Slug: {{SLUG}}
+- State dir: /workspace/stardust/
+- Prior outputs already available:
+  - /workspace/stardust/uplift-improvements.md (5 tensions)
+  - /workspace/stardust/current/brand-review.html
+  - /workspace/stardust/current/_brand-extraction.json
+  - /workspace/stardust/current/PRODUCT.md
+  - /workspace/stardust/current/DESIGN.md
+  - /workspace/stardust/current/DESIGN.json
+
+## DA Auth
+
+- Get IMS token: DA_TOKEN=$(oauth-token adobe)
+```
+
+**When scoop completes, the cone pushes:**
+```
 sprinkle send {{SLUG}}-pipeline '{"step":"direction","status":"done","summary":"3 variant directions resolved"}'
-sprinkle send {{SLUG}}-pipeline '{"step":"prototypes","status":"active","summary":"Generating 3 HTML prototypes..."}'
-
-### After PROTOTYPES complete:
 sprinkle send {{SLUG}}-pipeline '{"step":"prototypes","status":"done","summary":"3 variants ready for review"}'
 ```
 
-**If uplift asks about existing state** (prior `state.json` for same URL):
-- The scoop surfaces the question. The cone relays it to the user.
-- Feed the user's answer back: `feed_scoop("{{SLUG}}-uplift", "User answered: <answer>. Continue.")`
-
-**Uplift outputs when complete:**
+**Uplift outputs when both scoops are done:**
 - `/workspace/stardust/uplift-improvements.md` — 5 tensions
 - `/workspace/stardust/current/brand-review.html` — brand review page
 - `/workspace/stardust/current/_brand-extraction.json` — palette + type
@@ -138,22 +186,18 @@ sprinkle send {{SLUG}}-pipeline '{"step":"prototypes","status":"done","summary":
 - `/workspace/stardust/prototypes/home-C-cinematic.html`
 - `/workspace/stardust/direction.md` — variant directions + recommendation
 
-### Step 3 — Build deliverables & commit to EDS
+### Step 4 — Build deliverables & commit to EDS
 
-Once the uplift scoop completes, the cone builds standalone deliverables and commits them
-to the EDS repo. This makes all content publicly accessible for followers via EDS URLs.
+The cone builds standalone deliverables and commits them to the EDS repo.
 
-**Deliverable structure in the EDS repo:**
+**Deliverable structure:**
 ```
 {repo}/deliverables/
-├── audit.html            ← standalone, self-contained audit page
+├── audit.html            ← standalone self-contained audit page
 ├── brand-review.html     ← standalone brand review page
 ├── variant-A.html        ← prototype A
-├── variant-A.png         ← screenshot of A
 ├── variant-B.html        ← prototype B
-├── variant-B.png         ← screenshot of B
 ├── variant-C.html        ← prototype C (cinematic)
-└── variant-C.png         ← screenshot of C
 ```
 
 **Steps:**
@@ -163,7 +207,7 @@ to the EDS repo. This makes all content publicly accessible for followers via ED
    - Parse 5 tensions into JSON array: `[{"category":"...","title":"...","body":"..."},...]`
      Valid categories: `dated-pattern`, `ia-clutter`, `density`, `cliche`, `missed-opportunity`
    - Read `/workspace/skills/stardust-demo/templates/audit.html.tpl`
-   - Replace `{{URL}}` and `{{TENSIONS_JSON}}` (data island — paste raw JSON)
+   - Replace `{{URL}}` and `{{TENSIONS_JSON}}` (data island — paste raw JSON, no escaping)
    - Write to `{repo}/deliverables/audit.html`
 
 2. **Copy brand-review.html:**
@@ -174,66 +218,93 @@ to the EDS repo. This makes all content publicly accessible for followers via ED
    - `cp /workspace/stardust/prototypes/home-B-proposed.html {repo}/deliverables/variant-B.html`
    - `cp /workspace/stardust/prototypes/home-C-cinematic.html {repo}/deliverables/variant-C.html`
 
-4. **Take screenshots:**
-   - Open each prototype in the browser, take full-page screenshots
-   - Save to `{repo}/deliverables/variant-A.png`, `variant-B.png`, `variant-C.png`
-
-5. **Commit & push:**
+4. **Commit & push:**
    ```bash
    cd {repo}
    git add deliverables/
-   git commit -m "Add stardust deliverables — audit, brand review, 3 prototypes + screenshots"
+   git commit -m "Add stardust deliverables — audit, brand review, 3 prototypes"
    git push origin {branch}
    ```
 
-6. **Trigger EDS preview** so URLs are live before sprinkles open:
+5. **Trigger EDS preview** so URLs are live:
    ```bash
    DA_TOKEN=$(oauth-token adobe)
-   curl -X POST -H "Authorization: Bearer $DA_TOKEN" \
-     https://admin.hlx.page/preview/{owner}/{repo}/{branch}/deliverables/audit
-   curl -X POST -H "Authorization: Bearer $DA_TOKEN" \
-     https://admin.hlx.page/preview/{owner}/{repo}/{branch}/deliverables/brand-review
-   # etc for each file
+   for page in audit brand-review variant-A variant-B variant-C; do
+     curl -X POST -H "Authorization: Bearer $DA_TOKEN" \
+       https://admin.hlx.page/preview/{owner}/{repo}/{branch}/deliverables/$page
+   done
    ```
 
-**EDS base URL:** `https://{branch}--{repo}--{owner}.aem.page/deliverables/`
+**EDS base URL:** `https://{branch}--{repo}--{owner}.aem.page/deliverables`
 
-### Step 4 — Open sprinkles (thin wrappers around EDS)
+### Step 5 — Take screenshots from live EDS URLs
 
-Now that deliverables are live on EDS, open the 3 remaining sprinkles.
+Screenshots MUST be taken from the live EDS URLs (not file:// paths):
+
+```bash
+EDS_BASE="https://{branch}--{repo}--{owner}.aem.page/deliverables"
+
+# Open each variant in the browser
+playwright-cli open "$EDS_BASE/variant-A.html"
+sleep 4
+playwright-cli screenshot --fullPage --max-width 480 /shared/{{SLUG}}-variant-A.png
+playwright-cli tab-close
+
+playwright-cli open "$EDS_BASE/variant-B.html"
+sleep 4
+playwright-cli screenshot --fullPage --max-width 480 /shared/{{SLUG}}-variant-B.png
+playwright-cli tab-close
+
+playwright-cli open "$EDS_BASE/variant-C.html"
+sleep 4
+playwright-cli screenshot --fullPage --max-width 480 /shared/{{SLUG}}-variant-C.png
+playwright-cli tab-close
+```
+
+Keep screenshots under ~100KB each (use `--max-width 480`).
+
+### Step 6 — Open sprinkles
+
+Now that deliverables are live on EDS and screenshots are taken, open the 3 remaining sprinkles.
 
 **EDS_BASE** = `https://{branch}--{repo}--{owner}.aem.page/deliverables`
 
-#### 4a. Audit sprinkle (iframe)
+#### 6a. Audit sprinkle (iframe)
 
 1. Read `/workspace/skills/stardust-demo/templates/audit.shtml.tpl`
-2. Replace `{{URL}}`, `{{SLUG}}`, `{{AUDIT_URL}}` with `{EDS_BASE}/audit.html`
+2. Replace `{{URL}}`, `{{AUDIT_URL}}` with `{EDS_BASE}/audit.html`
 3. Write to `/shared/sprinkles/{{SLUG}}-audit/{{SLUG}}-audit.shtml`
 4. Run: `sprinkle open {{SLUG}}-audit`
 
-#### 4b. Brand review sprinkle (iframe)
+#### 6b. Brand review sprinkle (iframe)
 
 1. Read `/workspace/skills/stardust-demo/templates/brand-review.shtml.tpl`
 2. Replace `{{URL}}`, `{{BRAND_REVIEW_URL}}` with `{EDS_BASE}/brand-review.html`
 3. Write to `/shared/sprinkles/{{SLUG}}-brand-review/{{SLUG}}-brand-review.shtml`
 4. Run: `sprinkle open {{SLUG}}-brand-review`
 
-#### 4c. Variants sprinkle (interactive — has deploy button)
+#### 6c. Variants sprinkle (interactive)
 
 1. Read `/workspace/stardust/direction.md` — extract:
    - Per variant: key (A/B/C), title, pitch, what-if question, moves array, role
    - Which variant is recommended
    - Shared fixes across all variants
-2. Read `/workspace/skills/stardust-demo/templates/variants.shtml.tpl`
-3. Replace `{{URL}}` and `{{SLUG}}`
-4. Replace `{{VARIANTS_JSON}}` with a single JSON object in the data island:
+2. Convert screenshots to base64 data URIs:
+   ```bash
+   SCREENSHOT_A=$(base64 < /shared/{{SLUG}}-variant-A.png)
+   SCREENSHOT_B=$(base64 < /shared/{{SLUG}}-variant-B.png)
+   SCREENSHOT_C=$(base64 < /shared/{{SLUG}}-variant-C.png)
+   ```
+3. Read `/workspace/skills/stardust-demo/templates/variants.shtml.tpl`
+4. Replace `{{URL}}` and `{{SLUG}}`
+5. Replace `{{VARIANTS_JSON}}` with a single JSON object in the data island:
    ```json
    {
      "variants": [
        {
          "key": "A",
          "url": "{EDS_BASE}/variant-A.html",
-         "screenshot": "{EDS_BASE}/variant-A.png",
+         "screenshot": "data:image/png;base64,{SCREENSHOT_A}",
          "title": "...",
          "pitch": "...",
          "whatif": "...",
@@ -247,24 +318,29 @@ Now that deliverables are live on EDS, open the 3 remaining sprinkles.
      "recommended": "B"
    }
    ```
-5. Write to `/shared/sprinkles/{{SLUG}}-variants/{{SLUG}}-variants.shtml`
-6. Run: `sprinkle open {{SLUG}}-variants`
+6. Write to `/shared/sprinkles/{{SLUG}}-variants/{{SLUG}}-variants.shtml`
+   - **Check file size** — must be under 350KB total. If over, reduce screenshot quality.
+7. Run: `sprinkle open {{SLUG}}-variants`
 
-### Step 5 — Wait for variant selection (lick)
+### Step 7 — Wait for variant selection (lick)
 
 The variants sprinkle fires a lick when the user clicks "Deploy":
 ```json
-{"action": "select-variant", "variant": "B"}
+{"action": "select-variant", "data": {"variant": "B"}}
 ```
+
+**Note:** The lick uses `data: {variant: "B"}` — NOT a sibling `variant` key. The sprinkle bridge strips sibling keys; only `action` and `data` are preserved.
 
 When the cone receives this lick:
 1. Confirm with the user: "Deploy variant {{VARIANT}}? This will convert it to an EDS site."
-2. If confirmed, proceed to Step 6
+2. If confirmed, proceed to Step 8
 3. If the user wants a different variant, wait for another lick
 
-### Step 6 — Deploy (scoop)
+**Cherry follower limitation:** Cherry followers cannot open URLs from within sprinkles (iframe sandbox blocks navigation). When a user wants to preview a variant, post the EDS URL as a clickable link in chat instead.
 
-1. Push pipeline status FIRST — before spawning the scoop:
+### Step 8 — Deploy (scoop)
+
+1. Push pipeline status FIRST:
    ```
    sprinkle send {{SLUG}}-pipeline '{"step":"deploy","status":"active","summary":"Deploying variant {{VARIANT}} to EDS..."}'
    ```
@@ -297,6 +373,8 @@ When the cone receives this lick:
    - Get IMS token: DA_TOKEN=$(oauth-token adobe)
    - Upload content via DA API (PUT admin.da.live/source/...)
    - Trigger preview: POST admin.hlx.page/preview/{owner}/{repo}/{branch}/{page}
+   - NOTE: If admin.da.live is domain-restricted, use slicc.fetch or
+     playwright-cli fetch as a proxied alternative.
 
    ## Git rules
 
@@ -326,7 +404,7 @@ When the cone receives this lick:
    sprinkle send {{SLUG}}-pipeline '{"step":"deploy","status":"done","summary":"Live at {{PREVIEW_URL}}","link":"{{PREVIEW_URL}}"}'
    ```
 
-### Step 7 — Report
+### Step 9 — Report
 
 ```
 ✓ Demo ready — {{URL}}
@@ -344,14 +422,21 @@ Deployed: {{PREVIEW_URL}}
 
 If `/workspace/stardust/state.json` exists for the same URL:
 - Ask: "I have an existing uplift for `{{URL}}`. Re-run or reuse?"
-- If reuse: skip Step 2, go straight to Step 3 (deliverables)
+- If reuse: skip Steps 2-3, go straight to Step 4 (deliverables)
 - If re-run: clear `/workspace/stardust/` and start fresh
 
 ## Lick Events
 
 | Lick | Source | Cone action |
 |------|--------|-------------|
-| `{action: "select-variant", variant: "A\|B\|C"}` | variants sprinkle | Confirm with user, spawn deploy |
+| `{action: "select-variant", data: {variant: "A\|B\|C"}}` | variants sprinkle | Confirm with user, spawn deploy |
+
+## Known Limitations
+
+- **Cherry followers can't open URLs from sprinkles** — iframe sandbox blocks navigation. Workaround: cone posts clickable URLs in chat.
+- **DA API domain restriction** — `admin.da.live` may not be in the domain allowlist. Workaround: use `slicc.fetch` or `playwright-cli fetch` for DA operations.
+- **Sprinkle file size limit** — keep under ~350KB total. Screenshots must use `--max-width 480` to stay small enough for base64 embedding.
+- **Sprinkle overwrite doesn't push to followers** — always mint fresh names, never reuse.
 
 ## Design System
 

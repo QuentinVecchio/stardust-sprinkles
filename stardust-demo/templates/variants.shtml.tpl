@@ -402,7 +402,7 @@
     var variant = btn.getAttribute('data-variant');
     selectedVariant = variant;
     renderGallery();
-    slicc.lick({ action: 'select-variant', variant: variant });
+    slicc.lick({ action: 'select-variant', data: { variant: variant } });
   }
 
   renderFixes();
