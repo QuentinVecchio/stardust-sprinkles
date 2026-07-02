@@ -332,14 +332,7 @@ When the cone receives this lick:
 
 ### Step 6 — Deploy
 
-Deploy is split between the scoop (code conversion) and the cone (DA upload + preview).
-
-| Responsibility | Who |
-|---|---|
-| Convert prototype → EDS blocks + content HTML | Deploy scoop |
-| `git push` code (blocks/styles/scripts) | Deploy scoop |
-| Upload content to DA | Cone (via `mount`) |
-| Trigger preview | Cone (via `admin.hlx.page`) |
+The deploy scoop handles everything: code conversion, git push, DA upload, and preview.
 
 #### 6a. Push pipeline status
 
@@ -347,12 +340,12 @@ Deploy is split between the scoop (code conversion) and the cone (DA upload + pr
 sprinkle send {{SLUG}}-pipeline '{"step":"deploy","status":"active","summary":"Deploying variant {{VARIANT}} to EDS..."}'
 ```
 
-#### 6b. Spawn deploy scoop (code conversion only)
+#### 6b. Spawn deploy scoop
 
 ```
 scoop_scoop({
   name: "{{SLUG}}-deploy",
-  writablePaths: ["/scoops/{{SLUG}}-deploy/", "/shared/", "/workspace/{REPO}/"]
+  writablePaths: ["/scoops/{{SLUG}}-deploy/", "/shared/", "/workspace/{REPO}/", "/mnt/"]
 })
 ```
 
@@ -369,25 +362,42 @@ Then follow those instructions EXACTLY.
 - Prototype to deploy: /workspace/stardust/prototypes/home-{{VARIANT}}-proposed.html
   (if variant C: /workspace/stardust/prototypes/home-C-cinematic.html)
 - EDS repo: /workspace/{REPO}
+- Org: {org}
+- Repo: {repo}
+- Branch: {branch}
 - State dir: /shared/stardust-demo/
 
-## IMPORTANT — Scope limit
+## DA Auth — IMPORTANT
 
-You are responsible for CODE CONVERSION ONLY:
-- Convert prototype sections → EDS blocks (blocks/<name>/<name>.js + .css)
-- Write content pages as body-fragment HTML (content/index.html, content/nav.html, content/footer.html)
-- Update styles/styles.css with brand tokens
-- Self-host fonts with metric-matched fallbacks
-- Commit and push code to git
+The `oauth-token adobe` command returns an opaque token. This token works
+for `admin.hlx.page` but NOT for `admin.da.live` (returns 401).
 
-DO NOT attempt DA upload. DO NOT call admin.da.live.
-The cone handles DA upload separately via mount.
+To write content to DA, use the mount command instead:
+
+1. Mount DA:
+   mount --source da://{org}/{repo} /mnt/da
+
+2. Write content files:
+   cp content/index.html /mnt/da/index.html
+   cp content/nav.html /mnt/da/nav.html
+   cp content/footer.html /mnt/da/footer.html
+
+3. Trigger preview (hlx admin accepts the opaque token):
+   DA_TOKEN=$(oauth-token adobe)
+   curl -X POST -H "Authorization: Bearer $DA_TOKEN" \
+     "https://admin.hlx.page/preview/{org}/{repo}/{branch}/index"
+   curl -X POST -H "Authorization: Bearer $DA_TOKEN" \
+     "https://admin.hlx.page/preview/{org}/{repo}/{branch}/nav"
+   curl -X POST -H "Authorization: Bearer $DA_TOKEN" \
+     "https://admin.hlx.page/preview/{org}/{repo}/{branch}/footer"
+
+DO NOT use curl against admin.da.live — it will fail with 401.
+Always use mount for DA writes.
 
 ## Git rules
 
 - NEVER use `git add .` or `git add -A` — only add specific paths
 - One commit + one push at the end
-- Content HTML goes in content/ directory in the repo (for the cone to pick up)
 
 ## Naming questions
 
@@ -399,7 +409,7 @@ Then STOP and wait for answers via feed_scoop.
 ## Output contract
 
 Write to /shared/stardust-demo/deploy-status.json:
-{"status":"done","summary":"6 blocks built, content ready for DA upload"}
+{"status":"done","preview_url":"https://{branch}--{repo}--{org}.aem.page/","summary":"..."}
 ```
 
 **If deploy asks naming questions:**
@@ -407,37 +417,13 @@ Write to /shared/stardust-demo/deploy-status.json:
 - Present questions to the user in chat
 - Feed answers back: `feed_scoop("{{SLUG}}-deploy", "Answers: ...")`
 
-#### 6c. Cone handles DA upload + preview
+#### 6c. On completion
 
-When the deploy scoop completes (status file written), the cone:
+When the deploy scoop finishes (status file written):
 
-1. **Mount DA:**
-   ```bash
-   mount --source da://{org}/{repo} /mnt/da
-   ```
-
-2. **Upload content:**
-   ```bash
-   cp /workspace/{REPO}/content/index.html /mnt/da/index.html
-   cp /workspace/{REPO}/content/nav.html /mnt/da/nav.html
-   cp /workspace/{REPO}/content/footer.html /mnt/da/footer.html
-   ```
-
-3. **Trigger preview:**
-   ```bash
-   DA_TOKEN=$(oauth-token adobe)
-   curl -X POST -H "Authorization: Bearer $DA_TOKEN" \
-     "https://admin.hlx.page/preview/{org}/{repo}/{branch}/index"
-   curl -X POST -H "Authorization: Bearer $DA_TOKEN" \
-     "https://admin.hlx.page/preview/{org}/{repo}/{branch}/nav"
-   curl -X POST -H "Authorization: Bearer $DA_TOKEN" \
-     "https://admin.hlx.page/preview/{org}/{repo}/{branch}/footer"
-   ```
-
-4. **Push pipeline done:**
-   ```
-   sprinkle send {{SLUG}}-pipeline '{"step":"deploy","status":"done","summary":"Live at {{PREVIEW_URL}}","link":"{{PREVIEW_URL}}"}'
-   ```
+```
+sprinkle send {{SLUG}}-pipeline '{"step":"deploy","status":"done","summary":"Live at {{PREVIEW_URL}}","link":"{{PREVIEW_URL}}"}'
+```
 
 **PREVIEW_URL** = `https://{branch}--{repo}--{org}.aem.page/`
 
